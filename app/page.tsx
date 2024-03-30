@@ -1,113 +1,300 @@
-import Image from "next/image";
+"use client";
+import { getProducts } from "@/API/products";
+import { Product, ProductSkeleton } from "@/components/product";
+import { Accordion } from "@/components/ui/accordion";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { ProductState } from "@/lib/validators";
+import { ProductType } from "@/types/types";
+import {
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@radix-ui/react-accordion";
+import { useQuery } from "@tanstack/react-query";
+// import { QueryResult } from "@upstash/vector";
+// import axios from "axios";
+import { ChevronDown, FilterIcon } from "lucide-react";
+import { useState } from "react";
+
+const SORT_OPTIONS = [
+  { name: "None", value: "none" },
+  { name: "Price: Low to High", value: "price-asc" },
+  { name: "Price: High to Low", value: "price-desc" },
+] as const;
+
+const SUBCATEGORIES = [
+  { name: "T-Shirts", selected: true, href: "#" },
+  { name: "Hoodies", selected: false, href: "#" },
+  { name: "Sweatshirts", selected: false, href: "#" },
+  { name: "Accessories", selected: false, href: "#" },
+] as const;
+
+const COLOR_FILTERS = {
+  id: "color",
+  name: "Color",
+  options: [
+    { value: "white", label: "White" },
+    { value: "biege", label: "Biege" },
+    { value: "blue", label: "Blue" },
+    { value: "green", label: "Green" },
+    { value: "purple", label: "Purple" },
+  ] as const,
+};
+
+const SIZE_FILTERS = {
+  id: "size",
+  name: "Size",
+  options: [
+    { value: "S", label: "S" },
+    { value: "M", label: "M" },
+    { value: "L", label: "L" },
+  ],
+} as const;
+
+const PRICE_FILTERS = {
+  id: "price",
+  name: "Price",
+  options: [
+    { value: [0, 100], label: "Any Price" },
+    { value: [0, 20], label: "Under 20$" },
+    { value: [0, 40], label: "Under 40$" },
+    // custom option to be defined in JSX
+  ],
+} as const;
+
+const DEFAULT_PRICE = [0, 20] as [number, number];
 
 export default function Home() {
+  const [filter, setFilter] = useState<ProductState>({
+    color: ["biege", "white", "blue", "green", "purple"],
+    sort: "none",
+    price: { isCustom: false, range: DEFAULT_PRICE },
+    size: ["L", "M", "S"],
+  });
+
+  const { data } = useQuery({
+    queryKey: ["products"],
+    // queryFn: async () => {
+    //   const {data} = await axios.post<QueryResult<Product>[]>(`/api/products`, {
+    //     filter: {
+    //       sort: filter.sort
+    //     }
+    //   });
+    //   return data
+    // },
+    queryFn: () => getProducts({ filter }),
+  });
+
+  const applyArrayFilter = ({
+    category,
+    value,
+  }: {
+    category: keyof Omit<typeof filter, "price" | "sort">;
+    value: string;
+  }) => {
+    const isFilterApplied = filter[category].includes(value as never);
+
+    if (isFilterApplied) {
+      setFilter((prev) => ({
+        ...prev,
+        [category]: prev[category].filter((v) => v !== value),
+      }));
+    } else {
+      setFilter((prev) => ({
+        ...prev,
+        [category]: [...prev[category], value],
+      }));
+    }
+  };
+  console.log(filter);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="flex items-baseline justify-between border-b border-gray-300 pt-24 pb-6">
+        <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+          High Quality Cotton Collections
+        </h1>
+
+        <div className="flex items-center relative">
+          <DropdownMenu>
+            <DropdownMenuTrigger className="group inline-flex gap-1 justify-center text-sm font-medium text-gray-700 hover:text-gray-900">
+              Filter
+              <ChevronDown className="size-5 group-hover:text-gray-900" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="p-0">
+              {SORT_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setFilter((prev) => ({
+                      ...prev,
+                      sort: option.value,
+                    }));
+                  }}
+                  className={cn("text-left w-full block px-4 py-2 text-sm", {
+                    "text-gray-900 bg-gray-100": option.value === filter.sort,
+                    "text-gray-500": option.value !== filter.sort,
+                  })}
+                >
+                  {option.name}
+                </button>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <button className="lg:hidden text-gray-400 hover:text-gray-500 -m-2 ml-4 p-2 sm:ml-6">
+            <FilterIcon className="size-5" />
+          </button>
         </div>
       </div>
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-full sm:before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full sm:after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
+      <section className="pb-24 pt-6">
+        <div className="grid lg:grid-cols-4 grid-cols-1 gap-x-8 gap-y-10">
+          {/* Filters */}
+          <div className="hidden lg:block sticky">
+            <div className="space-y-4 border-b border-gray-300 pb-6 text-sm font-medium text-gray-900">
+              {SUBCATEGORIES.map((cat) => (
+                <div key={cat.name}>
+                  <button
+                    disabled={!cat.selected}
+                    className="disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {cat.name}
+                  </button>
+                </div>
+              ))}
+            </div>
 
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
+            <Accordion type="multiple" className="w-full animate-none">
+              {/* Color Filter */}
+              <AccordionItem
+                value="color"
+                className="border-b border-gray-300 py-1"
+              >
+                <AccordionTrigger className="py-3 text-sm text-gray-400 hover:text-gray-500">
+                  <span className="font-medium text-gray-900">Colors</span>
+                </AccordionTrigger>
+                <AccordionContent className="pt-3 animate-none">
+                  <div className="space-y-4">
+                    {COLOR_FILTERS.options.map((option, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          id={`color-${idx}`}
+                          checked={filter.color.includes(option.value)}
+                          className="size-4 rounded text-indigo-600 focus:ring-indigo-300"
+                          onChange={() =>
+                            applyArrayFilter({
+                              category: "color",
+                              value: option.value,
+                            })
+                          }
+                        />
+                        <label htmlFor={`color-${idx}`}>{option.label}</label>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
 
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
+              {/* Size Filter */}
+              <AccordionItem
+                value="size"
+                className="border-b border-gray-300 py-1"
+              >
+                <AccordionTrigger className="py-3 text-sm text-gray-400 hover:text-gray-500">
+                  <span className="font-medium text-gray-900">Size</span>
+                </AccordionTrigger>
+                <AccordionContent className="pt-3 animate-none">
+                  <div className="space-y-4">
+                    {SIZE_FILTERS.options.map((option, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          id={`size-${idx}`}
+                          checked={filter.size.includes(option.value)}
+                          className="size-4 rounded text-indigo-600 focus:ring-indigo-300"
+                          onChange={() =>
+                            applyArrayFilter({
+                              category: "size",
+                              value: option.value,
+                            })
+                          }
+                        />
+                        <label htmlFor={`size-${idx}`}>{option.label}</label>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
 
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore starter templates for Next.js.
-          </p>
-        </a>
+              {/* Price Filter */}
+              <AccordionItem
+                value="price"
+                className="border-b border-gray-300 py-1"
+              >
+                <AccordionTrigger className="py-3 text-sm text-gray-400 hover:text-gray-500">
+                  <span className="font-medium text-gray-900">Price</span>
+                </AccordionTrigger>
+                <AccordionContent className="pt-3 animate-none">
+                  <div className="space-y-4">
+                    {PRICE_FILTERS.options.map((option, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <input
+                          type="radio"
+                          name="price"
+                          id={`size-${idx}`}
+                          checked={
+                            !filter.price.isCustom &&
+                            filter.price.range[0] === option.value[0] &&
+                            filter.price.range[1] === option.value[1]
+                          }
+                          className="size-4 rounded text-indigo-600 focus:ring-indigo-300"
+                          onChange={() =>
+                            setFilter((prev) => ({
+                              ...prev,
+                              price: {
+                                isCustom: false,
+                                range: [...option.value],
+                              },
+                            }))
+                          }
+                        />
+                        <label htmlFor={`size-${idx}`}>{option.label}</label>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
 
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50 text-balance`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
+          {/* Products */}
+          <div className="grid lg:col-span-3 md:grid-cols-3 sm:grid-cols-2 grid-cols-1 gap-8">
+            {data
+              ? data.map((prod: any) => (
+                  <Product key={prod.id} product={prod.metadata!} />
+                ))
+              : new Array(12)
+                  .fill(null)
+                  .map((_, i) => <ProductSkeleton key={i} />)}
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
