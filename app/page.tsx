@@ -1,6 +1,6 @@
 "use client";
 import { getProducts } from "@/API/products";
-import { Product, ProductSkeleton } from "@/components/product";
+import { EmptyState, Product, ProductSkeleton } from "@/components/product";
 import { Accordion } from "@/components/ui/accordion";
 import {
   DropdownMenu,
@@ -17,7 +17,11 @@ import {
 } from "@radix-ui/react-accordion";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, FilterIcon } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import debounce from "lodash.debounce";
+import axios from "axios";
+import { QueryResult } from "@upstash/vector";
+import { ProductType } from "@/types/types";
 
 const SORT_OPTIONS = [
   { name: "None", value: "none" },
@@ -75,18 +79,29 @@ export default function Home() {
     size: ["L", "M", "S"],
   });
 
-  const { data } = useQuery({
+  const { data, refetch: refetchProducts } = useQuery({
     queryKey: ["products"],
-    // queryFn: async () => {
-    //   const {data} = await axios.post<QueryResult<Product>[]>(`/api/products`, {
-    //     filter: {
-    //       sort: filter.sort
-    //     }
-    //   });
-    //   return data
-    // },
-    queryFn: () => getProducts(filter),
+    queryFn: async () => {
+      const { data } = await axios.post<QueryResult<ProductType>[]>(
+        `/api/products`,
+        {
+          filter: {
+            sort: filter.sort,
+            color: filter.color,
+            price: filter.price.range,
+            size: filter.size,
+          },
+        }
+      );
+      return data;
+    },
+    // queryFn: () => getProducts(filter),
   });
+
+  const onSubmit = () => refetchProducts();
+
+  const debouncedSubmit = debounce(onSubmit, 500);
+  const _debouncedSubmmit = useCallback(debouncedSubmit, []);
 
   const applyArrayFilter = ({
     category,
@@ -108,12 +123,11 @@ export default function Home() {
         [category]: [...prev[category], value],
       }));
     }
+    _debouncedSubmmit();
   };
 
   const minPrice = Math.min(filter.price.range[0], filter.price.range[1]);
   const maxPrice = Math.max(filter.price.range[0], filter.price.range[1]);
-
-  console.log(filter);
 
   return (
     <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -137,6 +151,7 @@ export default function Home() {
                       ...prev,
                       sort: option.value,
                     }));
+                    _debouncedSubmmit();
                   }}
                   className={cn("text-left w-full block px-4 py-2 text-sm", {
                     "text-gray-900 bg-gray-100": option.value === filter.sort,
@@ -266,15 +281,16 @@ export default function Home() {
                             filter.price.range[1] === option.value[1]
                           }
                           className="size-4 rounded text-indigo-600 focus:ring-indigo-300"
-                          onChange={() =>
+                          onChange={() => {
                             setFilter((prev) => ({
                               ...prev,
                               price: {
                                 isCustom: false,
                                 range: [...option.value],
                               },
-                            }))
-                          }
+                            }));
+                            _debouncedSubmmit();
+                          }}
                         />
                         <label htmlFor={`price-${idx}`}>{option.label}</label>
                       </div>
@@ -329,6 +345,7 @@ export default function Home() {
                             range: [min, max],
                           },
                         }));
+                        _debouncedSubmmit();
                       }}
                       value={
                         filter.price.isCustom
@@ -348,13 +365,19 @@ export default function Home() {
 
           {/* Products */}
           <div className="grid lg:col-span-3 md:grid-cols-3 sm:grid-cols-2 grid-cols-1 gap-8">
-            {data
-              ? data.map((prod: any) => (
-                  <Product key={prod.id} product={prod.metadata!} />
-                ))
-              : new Array(12)
-                  .fill(null)
-                  .map((_, i) => <ProductSkeleton key={i} />)}
+            {/* @ts-ignore */}
+            {data && data.products.length === 0 ? (
+              <EmptyState />
+            ) : data ? (
+              // @ts-ignore
+              data.products.map((prod: any) => (
+                <Product key={prod.id} product={prod.metadata!} />
+              ))
+            ) : (
+              new Array(12)
+                .fill(null)
+                .map((_, i) => <ProductSkeleton key={i} />)
+            )}
           </div>
         </div>
       </section>
